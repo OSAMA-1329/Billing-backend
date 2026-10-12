@@ -28,12 +28,12 @@ await Promise.all([
   Settings.deleteMany({}),
 ]);
 
-const adminHash = await bcrypt.hash('123', 10);
+const adminHash = await bcrypt.hash('1234', 10);
 const admin = await User.create(
 
   {
     name: 'Admin',
-    email: 'ar@gmail.com',
+    email: 'osama@gmail.com',
     password: adminHash,
     role: 'ADMIN',
   });

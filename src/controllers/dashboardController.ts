@@ -39,7 +39,19 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     ] = await Promise.all([
       SalesInvoice.aggregate([
         { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
-        { $group: { _id: null, total: { $sum: '$grandTotal' }, count: { $sum: 1 } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$grandTotal' },
+            count: { $sum: 1 },
+            cashSales: {
+              $sum: { $cond: [{ $eq: ['$paymentMethod', 'Cash'] }, '$paidAmount', 0] },
+            },
+            upiSales: {
+              $sum: { $cond: [{ $eq: ['$paymentMethod', 'UPI'] }, '$paidAmount', 0] },
+            },
+          },
+        },
       ]),
       PurchaseInvoice.aggregate([
         { $match: { invoiceDate: { $gte: today, $lt: tomorrow }, status: 'COMPLETED' } },
@@ -89,6 +101,8 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     sendSuccess(res, {
       todaySales: todaySalesAgg[0]?.total || 0,
       todaySalesCount: todaySalesAgg[0]?.count || 0,
+      todayCashSales: todaySalesAgg[0]?.cashSales || 0,
+      todayUpiSales: todaySalesAgg[0]?.upiSales || 0,
       todayPurchases: todayPurchasesAgg[0]?.total || 0,
       todayPurchasesCount: todayPurchasesAgg[0]?.count || 0,
       todayBills,
