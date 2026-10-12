@@ -15,5 +15,5 @@ if (!uri) {
 await connectDB(uri);
 
 app.listen(port, () => {
-  console.log(`API listening on ${port}`);
+  console.log(`API listening on https://billing-backend-5xym.onrender.com:${port}`);
 });
