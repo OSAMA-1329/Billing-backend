@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/

@@ -31,7 +31,7 @@ await Promise.all([
 const adminHash = await bcrypt.hash('123', 10);
 const admin = await User.create({
   name: 'Admin',
-  email: 'artraders@gmail.com',
+  email: 'ar@gmail.com',
   password: adminHash,
   role: 'ADMIN',
 });
