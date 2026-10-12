@@ -29,12 +29,14 @@ await Promise.all([
 ]);
 
 const adminHash = await bcrypt.hash('123', 10);
-const admin = await User.create({
-  name: 'Admin',
-  email: 'ar@gmail.com',
-  password: adminHash,
-  role: 'ADMIN',
-});
+const admin = await User.create(
+
+  {
+    name: 'Admin',
+    email: 'ar@gmail.com',
+    password: adminHash,
+    role: 'ADMIN',
+  });
 
 await Settings.create({ shopName: 'Demo Shop', phone: '9876543210', address: 'Main Street' });
 
@@ -134,5 +136,5 @@ await createSale(
 );
 
 console.log('Seed complete.');
-console.log('Login: artraders@gmail.com / 123');
+console.log('Login: ',admin);
 await mongoose.disconnect();
