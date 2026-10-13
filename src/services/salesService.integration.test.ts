@@ -5,6 +5,7 @@ import { after, before, describe, test } from 'node:test';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import app from '../app.js';
+import { Customer } from '../models/Customer.js';
 import { Product } from '../models/Product.js';
 import { SalesInvoice } from '../models/SalesInvoice.js';
 import { Supplier } from '../models/Supplier.js';
@@ -178,6 +179,57 @@ describe('standalone sales quantity integration', { skip: !testUri }, () => {
     const updated = await Product.findById(product._id);
     closeTo(updated!.stockBaseQuantity!, 1000);
     closeTo(updated!.availableStock, 1);
+  });
+
+  test('auto-adds named customers and defaults unnamed sales to Walk-in Customer', async () => {
+    const product = await addProduct('Pcs', 10, 10);
+    const namedInvoice = await createSale({
+      items: [{ productId: String(product._id), quantity: 1, unit: 'Pcs' }],
+      discount: 0,
+      paidAmount: 0,
+      paymentMethod: 'Cash',
+      customerName: 'Counter Customer',
+      customerPhone: '555-0102',
+    });
+    const defaultInvoice = await bill([{ productId: String(product._id), quantity: 1, unit: 'Pcs' }]);
+
+    assert.equal(namedInvoice.customerName, 'Counter Customer');
+    assert.equal(namedInvoice.customerPhone, '555-0102');
+    assert.ok(namedInvoice.customerId);
+    const addedCustomer = await Customer.findById(namedInvoice.customerId);
+    assert.equal(addedCustomer?.name, 'Counter Customer');
+    assert.equal(addedCustomer?.phone, '555-0102');
+    assert.equal(defaultInvoice.customerName, 'Walk-in Customer');
+    assert.equal(defaultInvoice.customerId, undefined);
+  });
+
+  test('sale deletion skips missing products and restores products that remain', async () => {
+    const deletedProduct = await addProduct('Pcs', 10, 10);
+    const retainedProduct = await addProduct('Kg', 1, 55);
+    const invoice = await bill([
+      { productId: String(deletedProduct._id), quantity: 2, unit: 'Pcs' },
+      { productId: String(retainedProduct._id), quantity: 500, unit: 'g' },
+    ]);
+    await Product.deleteOne({ _id: deletedProduct._id });
+
+    await deleteSale(String(invoice._id));
+
+    const retainedAfter = await Product.findById(retainedProduct._id);
+    assert.equal(await SalesInvoice.findById(invoice._id), null);
+    closeTo(retainedAfter!.stockBaseQuantity!, 1000);
+    closeTo(retainedAfter!.availableStock, 1);
+  });
+
+  test('sale deletion can leave stock unchanged when requested', async () => {
+    const product = await addProduct('Pcs', 10, 10);
+    const invoice = await bill([{ productId: String(product._id), quantity: 2, unit: 'Pcs' }]);
+
+    await deleteSale(String(invoice._id), false);
+
+    const productAfter = await Product.findById(product._id);
+    assert.equal(await SalesInvoice.findById(invoice._id), null);
+    assert.equal(productAfter!.availableStock, 8);
+    assert.equal(productAfter!.stockBaseQuantity, 8);
   });
 
   test('editing a sale updates stock without changing its invoice number', async () => {

@@ -9,6 +9,8 @@ const salesItemSchema = z.object({
 
 export const salesSchema = z.object({
   customerId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid customer id').optional(),
+  customerName: z.string().trim().max(120).optional(),
+  customerPhone: z.string().trim().max(40).optional(),
   items: z.array(salesItemSchema).min(1),
   discount: z.number().min(0).default(0),
   paidAmount: z.number().min(0).default(0),

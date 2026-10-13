@@ -125,7 +125,10 @@ export async function deleteSale(
   next: NextFunction
 ) {
   try {
-    const result = await salesService.deleteSale(String(req.params.id));
+    const result = await salesService.deleteSale(
+      String(req.params.id),
+      req.query.restock !== 'false'
+    );
     sendSuccess(res, result);
   } catch (e) {
     next(e);

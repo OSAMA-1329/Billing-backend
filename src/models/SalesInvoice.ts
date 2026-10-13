@@ -25,6 +25,7 @@ const salesInvoiceSchema = new Schema(
     invoiceNumber: { type: String, required: true, unique: true, index: true },
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', index: true },
     customerName: { type: String, default: 'Walk-in Customer', trim: true },
+    customerPhone: { type: String, default: '', trim: true },
     items: { type: [salesItemSchema], default: [] },
     subtotal: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },

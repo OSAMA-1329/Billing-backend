@@ -24,6 +24,17 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const sevenDaysAgo = daysAgo(6);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const unitFactor = (unit: unknown) => ({
+      $switch: {
+        branches: [
+          { case: { $in: [unit, ['Kg', 'kg']] }, then: 1000 },
+          { case: { $in: [unit, ['L', 'l']] }, then: 1000 },
+        ],
+        default: 1,
+      },
+    });
 
     const [
       todaySalesAgg,
@@ -36,6 +47,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       salesTrend,
       purchaseTrend,
       topProducts,
+      monthProfitAgg,
     ] = await Promise.all([
       SalesInvoice.aggregate([
         { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
@@ -49,6 +61,9 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
             },
             upiSales: {
               $sum: { $cond: [{ $eq: ['$paymentMethod', 'UPI'] }, '$paidAmount', 0] },
+            },
+            creditDue: {
+              $sum: { $cond: [{ $eq: ['$paymentMethod', 'Credit'] }, '$balanceAmount', 0] },
             },
           },
         },
@@ -96,6 +111,100 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
         { $sort: { qty: -1 } },
         { $limit: 5 },
       ]),
+      SalesInvoice.aggregate([
+        { $match: { createdAt: { $gte: monthStart, $lt: tomorrow } } },
+        { $unwind: '$items' },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
+          },
+        },
+        { $unwind: '$product' },
+        {
+          $group: {
+            _id: null,
+            retailProfit: {
+              $sum: {
+                $subtract: [
+                  '$items.total',
+                  {
+                    $multiply: [
+                      {
+                        $divide: [
+                          {
+                            $ifNull: [
+                              '$items.baseQuantity',
+                              {
+                                $multiply: [
+                                  '$items.quantity',
+                                  unitFactor({ $ifNull: ['$items.unit', '$product.unit'] }),
+                                ],
+                              },
+                            ],
+                          },
+                          unitFactor({ $ifNull: ['$items.priceUnit', '$product.unit'] }),
+                        ],
+                      },
+                      '$product.purchaseCost',
+                    ],
+                  },
+                ],
+              },
+            },
+            wholesaleProfit: {
+              $sum: {
+                $subtract: [
+                  {
+                    $multiply: [
+                      { $ifNull: ['$items.wholesalePrice', '$product.wholesalePrice'] },
+                      {
+                        $divide: [
+                          {
+                            $ifNull: [
+                              '$items.baseQuantity',
+                              {
+                                $multiply: [
+                                  '$items.quantity',
+                                  unitFactor({ $ifNull: ['$items.unit', '$product.unit'] }),
+                                ],
+                              },
+                            ],
+                          },
+                          unitFactor({ $ifNull: ['$items.priceUnit', '$product.unit'] }),
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    $multiply: [
+                      {
+                        $divide: [
+                          {
+                            $ifNull: [
+                              '$items.baseQuantity',
+                              {
+                                $multiply: [
+                                  '$items.quantity',
+                                  unitFactor({ $ifNull: ['$items.unit', '$product.unit'] }),
+                                ],
+                              },
+                            ],
+                          },
+                          unitFactor({ $ifNull: ['$items.priceUnit', '$product.unit'] }),
+                        ],
+                      },
+                      '$product.purchaseCost',
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ]),
     ]);
 
     sendSuccess(res, {
@@ -103,6 +212,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       todaySalesCount: todaySalesAgg[0]?.count || 0,
       todayCashSales: todaySalesAgg[0]?.cashSales || 0,
       todayUpiSales: todaySalesAgg[0]?.upiSales || 0,
+      todayCredit: todaySalesAgg[0]?.creditDue || 0,
       todayPurchases: todayPurchasesAgg[0]?.total || 0,
       todayPurchasesCount: todayPurchasesAgg[0]?.count || 0,
       todayBills,
@@ -113,6 +223,8 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       salesTrend,
       purchaseTrend,
       topProducts,
+      monthRetailProfit: monthProfitAgg[0]?.retailProfit || 0,
+      monthWholesaleProfit: monthProfitAgg[0]?.wholesaleProfit || 0,
     });
   } catch (e) {
     next(e);

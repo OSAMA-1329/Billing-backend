@@ -27,14 +27,24 @@ export async function createSale(data: SalesInput, userId?: string) {
   let invoiceId: mongoose.Types.ObjectId | undefined;
   let invoiceNumberForRollback: string | undefined;
   let invoiceCustomerId: mongoose.Types.ObjectId | undefined;
+  let createdCustomerId: mongoose.Types.ObjectId | undefined;
   let invoiceBalanceAmount = 0;
   const appliedStock: { productId: mongoose.Types.ObjectId; quantity: number }[] = [];
   let customerBalanceUpdated = false;
   try {
-    const customer = data.customerId
+    let customer = data.customerId
       ? await Customer.findById(data.customerId)
       : null;
     if (data.customerId && !customer) throw new AppError('Customer not found', 404);
+    const customerName = data.customerName?.trim();
+    const customerPhone = data.customerPhone?.trim() || '';
+    if (!customer && customerName) {
+      customer = await Customer.findOne({ name: customerName, phone: customerPhone });
+      if (!customer) {
+        customer = await Customer.create({ name: customerName, phone: customerPhone });
+        createdCustomerId = customer._id;
+      }
+    }
     if (data.paymentMethod === 'Credit' && !customer) {
       throw new AppError('Select a customer for credit sales', 400);
     }
@@ -112,7 +122,8 @@ export async function createSale(data: SalesInput, userId?: string) {
     const invoice = await SalesInvoice.create({
       invoiceNumber,
       customerId: customer?._id,
-      customerName: customer?.name || 'Walk-in Customer',
+      customerName: customer?.name || data.customerName?.trim() || 'Walk-in Customer',
+      customerPhone: customer?.phone || data.customerPhone?.trim() || '',
       items,
       subtotal,
       discount,
@@ -192,6 +203,14 @@ export async function createSale(data: SalesInput, userId?: string) {
         await SalesInvoice.deleteOne({ _id: invoiceId });
       } catch (rollbackError) {
         console.error('Failed to remove incomplete sale invoice', rollbackError);
+      }
+    }
+
+    if (createdCustomerId) {
+      try {
+        await Customer.deleteOne({ _id: createdCustomerId });
+      } catch (rollbackError) {
+        console.error('Failed to remove customer after sale error', rollbackError);
       }
     }
 
@@ -336,7 +355,8 @@ export async function updateSale(id: string, data: SalesInput) {
     }
 
     existing.customerId = customer?._id;
-    existing.customerName = customer?.name || 'Walk-in Customer';
+    existing.customerName = customer?.name || data.customerName?.trim() || 'Walk-in Customer';
+    existing.customerPhone = customer?.phone || data.customerPhone?.trim() || '';
     existing.set('items', items);
     existing.subtotal = subtotal;
     existing.discount = discount;
@@ -391,17 +411,17 @@ export async function updateSale(id: string, data: SalesInput) {
   }
 }
 
-export async function deleteSale(id: string) {
+export async function deleteSale(id: string, restockStock = true) {
   const existing = await SalesInvoice.findById(id);
   if (!existing) throw new AppError('Sale not found', 404);
 
   const restoredStock: { productId: mongoose.Types.ObjectId; quantity: number }[] = [];
   let customerBalanceReversed = false;
   try {
-    if (existing.stockApplied) {
+    if (existing.stockApplied && restockStock) {
       for (const item of existing.items) {
         const product = await Product.findById(item.productId);
-        if (!product) throw new AppError('Product not found while restoring sale stock', 404);
+        if (!product) continue;
         const baseQuantity = item.baseQuantity ?? convertToBaseQuantity(
           item.quantity,
           normalizeUnit(item.unit ?? product.unit)
