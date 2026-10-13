@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "test": "node --import tsx --test src/utils/units.test.ts src/services/salesService.integration.test.ts",
+    "test": "node --import tsx --test src/utils/units.test.ts src/services/salesRetention.test.ts src/services/salesService.integration.test.ts",
+    "retention:dry-run": "tsx src/retentionCli.ts",
     "start": "node dist/server.js",
     "seed": "tsx src/seed.ts"
   },

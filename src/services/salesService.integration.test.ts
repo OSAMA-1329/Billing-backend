@@ -268,8 +268,28 @@ describe('standalone sales quantity integration', { skip: !testUri }, () => {
         }),
       });
       assert.equal(saleResponse.status, 201);
-      const sale = await saleResponse.json() as { data: { grandTotal: number } };
+      const sale = await saleResponse.json() as { data: { _id: string; invoiceNumber: string; grandTotal: number } };
       assert.equal(sale.data.grandTotal, 27.5);
+
+      const detailResponse = await fetch(`${baseUrl}/sales/${sale.data._id}`, {
+        headers: { Authorization: `Bearer ${login.data.token}` },
+      });
+      assert.equal(detailResponse.status, 200);
+      const details = await detailResponse.json() as {
+        data: { _id: string; invoiceNumber: string; items: { productName: string; quantity: number; total: number }[] };
+      };
+      assert.equal(details.data._id, sale.data._id);
+      assert.equal(details.data.invoiceNumber, sale.data.invoiceNumber);
+      assert.equal(details.data.items.length, 1);
+      assert.equal(details.data.items[0].productName, product.productName);
+      assert.equal(details.data.items[0].quantity, 500);
+      assert.equal(details.data.items[0].total, 27.5);
+
+      const invoiceLookupResponse = await fetch(`${baseUrl}/sales/${sale.data.invoiceNumber}`, {
+        headers: { Authorization: `Bearer ${login.data.token}` },
+      });
+      assert.equal(invoiceLookupResponse.status, 200);
+
       const updated = await Product.findById(product._id);
       closeTo(updated!.stockBaseQuantity!, 500);
       closeTo(updated!.availableStock, 0.5);

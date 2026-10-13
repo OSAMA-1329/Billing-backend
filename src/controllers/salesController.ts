@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
+import mongoose from 'mongoose';
 import { SalesInvoice } from '../models/SalesInvoice.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import { AppError } from '../utils/AppError.js';
@@ -27,20 +28,81 @@ export async function listSales(req: Request, res: Response, next: NextFunction)
   }
 }
 
-export async function getSale(req: Request, res: Response, next: NextFunction) {
+// export async function getSale(req: Request, res: Response, next: NextFunction) {
+//   try {
+//     const identifier = req.params.id.trim();
+//     let query;
+//     if (mongoose.isValidObjectId(identifier)) {
+//       query = SalesInvoice.findById(identifier);
+//     } else if (/^[A-Za-z0-9][A-Za-z0-9/_-]{0,63}$/.test(identifier)) {
+//       query = SalesInvoice.findOne({ invoiceNumber: identifier });
+//     } else {
+//       throw new AppError('Invalid sale identifier', 400);
+//     }
+//     const doc = await query
+//       .populate('customerId', 'name phone address gstNumber')
+//       .populate('createdBy', 'name email role')
+//       .lean();
+//     if (!doc) throw new AppError('Sale not found', 404);
+//     sendSuccess(res, doc);
+//   } catch (e) {
+//     next(e);
+//   }
+// }
+
+export async function getSale(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const doc = await SalesInvoice.findById(req.params.id).lean();
-    if (!doc) throw new AppError('Sale not found', 404);
+    const rawId = req.params.id;
+
+    // Validate that the identifier is a single string.
+    if (typeof rawId !== "string") {
+      throw new AppError("Invalid sale identifier", 400);
+    }
+
+    const identifier = rawId.trim();
+
+    if (!identifier) {
+      throw new AppError("Sale identifier is required", 400);
+    }
+
+    let query;
+
+    if (mongoose.isValidObjectId(identifier)) {
+      query = SalesInvoice.findById(identifier);
+    } else if (
+      /^[A-Za-z0-9][A-Za-z0-9/_-]{0,63}$/.test(identifier)
+    ) {
+      query = SalesInvoice.findOne({
+        invoiceNumber: identifier,
+      });
+    } else {
+      throw new AppError("Invalid sale identifier", 400);
+    }
+
+    const doc = await query
+      .populate("customerId", "name phone address gstNumber")
+      .populate("createdBy", "name email role")
+      .lean();
+
+    if (!doc) {
+      throw new AppError("Sale not found", 404);
+    }
+
     sendSuccess(res, doc);
   } catch (e) {
     next(e);
   }
 }
 
+
 export async function createSale(req: Request, res: Response, next: NextFunction) {
   try {
     const invoice = await salesService.createSale(req.body, req.user?.id);
-    console.log('Sale created:', req.body, );
+    console.log('Sale created:', req.body,);
     sendSuccess(res, invoice, 201);
   } catch (e) {
     console.log('Error creating sale:', e);
