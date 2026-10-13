@@ -112,14 +112,8 @@ export async function createSale(req: Request, res: Response, next: NextFunction
 
 export async function updateSale(req: Request, res: Response, next: NextFunction) {
   try {
-    const existing = await SalesInvoice.findById(req.params.id);
-    if (!existing) throw new AppError('Sale not found', 404);
-    if (existing.stockApplied) {
-      throw new AppError('Posted sales cannot be edited. Void and re-create.', 400);
-    }
-    Object.assign(existing, req.body);
-    await existing.save();
-    sendSuccess(res, existing);
+    const invoice = await salesService.updateSale(String(req.params.id), req.body);
+    sendSuccess(res, invoice);
   } catch (e) {
     next(e);
   }

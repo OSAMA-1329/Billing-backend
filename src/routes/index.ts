@@ -66,7 +66,7 @@ router.get('/sales/export', authorize('ADMIN', 'MANAGER'), sales.exportSales);
 router.get('/sales', authorize('ADMIN', 'MANAGER', 'STAFF'), sales.listSales);
 router.get('/sales/:id', authorize('ADMIN', 'MANAGER', 'STAFF'), sales.getSale);
 router.post('/sales', authorize('ADMIN', 'MANAGER', 'STAFF'), validateBody(salesSchema), sales.createSale);
-router.put('/sales/:id', authorize('ADMIN', 'MANAGER'), sales.updateSale);
+router.put('/sales/:id', authorize('ADMIN', 'MANAGER'), validateBody(salesSchema), sales.updateSale);
 router.delete('/sales/:id', authorize('ADMIN', 'MANAGER'), sales.deleteSale);
 
 router.get('/stock/export', authorize('ADMIN', 'MANAGER'), stock.exportStock);

@@ -10,7 +10,7 @@ import { SalesInvoice } from '../models/SalesInvoice.js';
 import { Supplier } from '../models/Supplier.js';
 import { User } from '../models/User.js';
 import { createPurchase, deletePurchase } from './purchaseService.js';
-import { createSale, deleteSale } from './salesService.js';
+import { createSale, deleteSale, updateSale } from './salesService.js';
 
 type SaleLineInput = Parameters<typeof createSale>[0]['items'][number];
 
@@ -178,6 +178,35 @@ describe('standalone sales quantity integration', { skip: !testUri }, () => {
     const updated = await Product.findById(product._id);
     closeTo(updated!.stockBaseQuantity!, 1000);
     closeTo(updated!.availableStock, 1);
+  });
+
+  test('editing a sale updates stock without changing its invoice number', async () => {
+    const product = await addProduct('Kg', 1, 55);
+    const invoice = await bill([{ productId: String(product._id), quantity: 500, unit: 'g' }]);
+
+    const updatedInvoice = await updateSale(String(invoice._id), {
+      items: [{ productId: String(product._id), quantity: 250, unit: 'g' }],
+      discount: 0,
+      paidAmount: 0,
+      paymentMethod: 'Cash',
+    });
+    const updatedProduct = await Product.findById(product._id);
+
+    assert.equal(updatedInvoice.invoiceNumber, invoice.invoiceNumber);
+    assert.equal(updatedInvoice.items[0].quantity, 250);
+    closeTo(updatedProduct!.stockBaseQuantity!, 750);
+    closeTo(updatedProduct!.availableStock, 0.75);
+  });
+
+  test('deleting a sale keeps the next invoice number in sequence', async () => {
+    const product = await addProduct('Pcs', 3, 10);
+    const deletedInvoice = await bill([{ productId: String(product._id), quantity: 1, unit: 'Pcs' }]);
+    await deleteSale(String(deletedInvoice._id));
+    const nextInvoice = await bill([{ productId: String(product._id), quantity: 1, unit: 'Pcs' }]);
+
+    const deletedSequence = Number(deletedInvoice.invoiceNumber.split('-').at(-1));
+    const nextSequence = Number(nextInvoice.invoiceNumber.split('-').at(-1));
+    assert.equal(nextSequence, deletedSequence + 1);
   });
 
   test('legacy Kg and Pkt products infer their existing unit when omitted', async () => {
