@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import app from './app.js';
 import { connectDB } from './config/db.js';
+import { startSalesRetentionScheduler } from './services/salesRetentionService.js';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ if (!uri) {
 }
 
 await connectDB(uri);
+startSalesRetentionScheduler();
 
 app.listen(port, () => {
   console.log(`API listening on ${port}`);

@@ -26,8 +26,8 @@ export async function runSalesRetention(options: {
   dryRun?: boolean;
   now?: Date;
 } = {}): Promise<SalesRetentionResult> {
-  const months = options.months ?? Number(process.env.SALES_RETENTION_MONTHS || 10);
-  const dryRun = options.dryRun ?? process.env.SALES_RETENTION_DRY_RUN !== 'false';
+  const months = options.months ?? Number(process.env.SALES_RETENTION_MONTHS || 12);
+  const dryRun = options.dryRun ?? process.env.SALES_RETENTION_DRY_RUN === 'true';
   const cutoff = getSalesRetentionCutoff(options.now ?? new Date(), months);
   const filter = { createdAt: { $type: 'date' as const, $lt: cutoff } };
 

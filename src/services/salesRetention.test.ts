@@ -3,9 +3,9 @@ import { describe, test } from 'node:test';
 import { getSalesRetentionCutoff } from './salesRetentionService.js';
 
 describe('sales retention cutoff', () => {
-  test('uses calendar months and preserves UTC time', () => {
+  test('uses one calendar year and preserves UTC time', () => {
     const now = new Date('2026-10-13T18:42:17.123Z');
-    assert.equal(getSalesRetentionCutoff(now, 10).toISOString(), '2025-12-13T18:42:17.123Z');
+    assert.equal(getSalesRetentionCutoff(now, 12).toISOString(), '2025-10-13T18:42:17.123Z');
   });
 
   test('clamps to the final day of the target month', () => {
